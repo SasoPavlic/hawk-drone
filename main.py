@@ -5,6 +5,7 @@ from imutils.video import VideoStream
 from imutils.video import FPS
 from multiprocessing import Process
 from multiprocessing import Queue
+from multiprocessing import Pool
 import imutils
 import cv2
 import sys
@@ -16,8 +17,6 @@ import numpy as np
 
 
 _FINISH = False
-
-
 
 # Construct the argument parser and parse the argumetns
 ap = argparse.ArgumentParser()
@@ -52,7 +51,7 @@ if not (os.path.isfile('MobileNetSSD_deploy.caffemodel') and os.path.isfile('Mob
 frame_width = 640  # video.frame.shape[1]
 frame_height = 480  # video.frame.shape[0]
 
-out = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc(*'XVID'), 30, (frame_width, frame_height))
+out = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc(*'XVID'), 30.0, (frame_width, frame_height))
 
 # load our serialized model from disk
 print("[INFO] loading model...")
@@ -60,17 +59,8 @@ net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
 
 # initialize the input queue (frames), output queue (detections),
 # and the list of actual detections returned by the child process
-inputQueue = Queue(maxsize=1)
-outputQueue = Queue(maxsize=1)
-writerQueue = Queue(maxsize=1)
-
-
-def write_to_file(frame, frame_stack):  
-    while True:
-        if _FINISH:
-            break
-        if not frame_stack.empty():
-            out.write(frame_stack.get())
+inputQueue = Queue()
+outputQueue = Queue()
 
 def classify_frame(net, inputQueue, outputQueue):
     # keep looping
@@ -129,7 +119,7 @@ def get_direction(circle_cord):
 
     return "HOLD"
 
-def start():
+def main():
       
     # initialize the bounding box coordinates of the object we are going
     # to track
@@ -142,7 +132,7 @@ def start():
         video = VideoStream(src=0).start()
         time.sleep(1.0)
         fps = FPS().start()
-    else:
+    else:        
         video = cv2.VideoCapture(args["video"])
         # Exit if video not opened
         if not video.isOpened():
@@ -258,8 +248,8 @@ def start():
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
         cv2.line(frame, pt1=(frame_width//2,0), pt2=(frame_width//2,frame_height), color=(0,0,255), thickness=1)
-        cv2.line(frame, pt1=(0,frame_height//2), pt2=(frame_width,frame_height//2), color=(0,0,255), thickness=1)
-        writerQueue.put(frame)        
+        cv2.line(frame, pt1=(0,frame_height//2), pt2=(frame_width,frame_height//2), color=(0,0,255), thickness=1)        
+        out.write(frame)        
         
         if platform.uname()[4] == "x86_64":
             cv2.imshow("Frame", frame)
@@ -270,7 +260,7 @@ def start():
         if key == ord("q"):
             print("Key Q pressed...")        
             break
-        elif counter == 500:
+        elif counter == 1000:
             break
 
     print("--- %s seconds ---" % (time.time() - start_time))   
@@ -291,37 +281,30 @@ def start():
     
 
 if __name__ == '__main__':
-    print("[INFO] starting process...")
-    
-    frame = ""
-    p1 = Process(target=write_to_file, args=(frame,writerQueue))
-    p1.daemon = True
-    p1.start() 
+    print("[INFO] starting process...") 
+    p_classify = Process(target=classify_frame, args=(net, inputQueue,outputQueue))
+    p_classify.daemon = True
+    p_classify.start()
 
-    p2 = Process(target=classify_frame, args=(net, inputQueue,outputQueue))
-    p2.daemon = True
-    p2.start()
+    main()  
 
-    start()
+    print(f"main pid: {os.getpid()}")    
+    print(f"p_classify pid: {p_classify.pid}")
 
-   
+    print(f"[INFO] Emptying input and output queue")
+    while not inputQueue.empty():
+        print("waiting...")        
+        time.sleep(1)
 
-    print(f"main pid: {os.getpid()}")
-    print(f"p1 pid: {p1.pid}")
-    print(f"p2 pid: {p2.pid}")
 
-    
-    p1.terminate()
-    p2.terminate()
-    p1.join(timeout=1.0)
-    p2.join(timeout=1.0)
+    p_classify.terminate()    
+    p_classify.join(timeout=1.0)
+    p_classify.kill()
 
-    net = None
-    #inputQueue = None
-    #outputQueue = None
-    #writerQueue = None
     #https://stackoverflow.com/questions/32053618/how-to-to-terminate-process-using-pythons-multiprocessing
     #https://cuyu.github.io/python/2016/08/15/Terminate-multiprocess-in-Python-correctly-and-gracefully
 
+    #inputQueue.close()
+    #outputQueue.close()
     print("[INFO] Done")
     sys.exit()
