@@ -16,57 +16,21 @@ import platform
 import numpy as np
 
 
-_FINISH = False
-
-# Construct the argument parser and parse the argumetns
-ap = argparse.ArgumentParser()
-ap.add_argument("-v", "--video", type=str,
-                help="path to input video fileeeee")
-ap.add_argument("-p", "--prototxt", default="MobileNetSSD_deploy.prototxt.txt",
-                help="path to Caffe 'deploy' prototxt file")
-ap.add_argument("-m", "--model", default="MobileNetSSD_deploy.caffemodel",
-                help="path to Caffe pre-trained model")
-ap.add_argument("-c", "--confidence", type=float, default=0.20,
-                help="minimum probability to filter weak detections")
-args = vars(ap.parse_args())
-
-# initialize the list of class labels MobileNet SSD was trained to
-# detect, then generate a set of bounding box colors for each class
-CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
-        "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
-        "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
-        "sofa", "train", "tvmonitor"]
-COLORS = np.random.uniform(0, 255, size=(len(CLASSES), 3))
-
-
-if not (os.path.isfile('MobileNetSSD_deploy.caffemodel') and os.path.isfile('MobileNetSSD_deploy.prototxt.txt')):
-    errorMsg = '''
-    Could not find GOTURN model in current directory.
-    Please ensure goturn.caffemodel and goturn.prototxt are in the current directory
-    '''
-
-    print(errorMsg)
-    sys.exit()
-
+_MOVE_DIRECTION = "HOLD"
 frame_width = 640  # video.frame.shape[1]
 frame_height = 480  # video.frame.shape[0]
 
 out = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc(*'XVID'), 30.0, (frame_width, frame_height))
-
-# load our serialized model from disk
-print("[INFO] loading model...")
-net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
 
 # initialize the input queue (frames), output queue (detections),
 # and the list of actual detections returned by the child process
 inputQueue = Queue()
 outputQueue = Queue()
 
+
 def classify_frame(net, inputQueue, outputQueue):
     # keep looping
-    while True:
-        if _FINISH:
-            break
+    while True:       
         # check to see if there is a frame in our input queue
         if not inputQueue.empty():
             # grab the frame from the input queue, resize it, and
@@ -85,12 +49,14 @@ def classify_frame(net, inputQueue, outputQueue):
             outputQueue.put(detections)
 
 def get_direction(circle_cord):
-    ax = 100
-    ay = 400
-    bx = 550
-    by = 400
-    dx = 100
-    dy = 100
+    ax = 125
+    ay = 375
+    bx = 525
+    by = 375
+    cx = 525
+    cy = 125
+    dx = 125
+    dy = 125
 
     x = circle_cord[0]
     y = circle_cord[1]
@@ -101,16 +67,16 @@ def get_direction(circle_cord):
     day = dy - ay
 
     if ((x - ax) * bax + (y - ay) * bay < 0.0):
-        if x < 100 and y > 400:
+        if x < ax and y > ay:
             return "LEFT-DOWN"
-        elif x < 100 and y < 100:
+        elif x < dx and y < dy:
             return "LEFT-UP"
         else:
             return "LEFT"
     if ((x - bx) * bax + (y - by) * bay > 0.0):
-        if x > 550 and y > 400:
+        if x > bx and y > by:
             return "RIGHT-DOWN"
-        elif x > 550 and y < 100:
+        elif x > cx and y < cy:
             return "RIGHT-UP"
         else:
             return "RIGHT"
@@ -159,7 +125,7 @@ def main():
     counter = 0
     start_time = time.time()
     object_detected = False
-    move_direction = "HOLD"        
+    _MOVE_DIRECTION = "HOLD"      
 
 
 
@@ -188,48 +154,47 @@ def main():
 
         # if the output queue *is not* empty, grab the detections
         if not outputQueue.empty():
-            detections = outputQueue.get()
+            detections = outputQueue.get()        
         
-        if object_detected != True:
-            # check to see if our detectios are not None (and if so, we'll
-            # draw the detections on the frame)
-            if detections is not None:
-                # loop over the detections
-                for i in np.arange(0, detections.shape[2]):
-                    # extract the confidence (i.e., probability) associated
-                    # with the prediction
-                    confidence = detections[0, 0, i, 2]
+        # check to see if our detectios are not None (and if so, we'll
+        # draw the detections on the frame)
+        if detections is not None:
+            # loop over the detections
+            for i in np.arange(0, detections.shape[2]):
+                # extract the confidence (i.e., probability) associated
+                # with the prediction
+                confidence = detections[0, 0, i, 2]
 
-                    # filter out weak detections by ensuring the `confidence`
-                    # is greater than the minimum confidence
-                    if confidence < args["confidence"]:
-                        continue
+                # filter out weak detections by ensuring the `confidence`
+                # is greater than the minimum confidence
+                if confidence < args["confidence"]:
+                    continue
 
-                    # otherwise, extract the index of the class label from
-                    # the `detections`, then compute the (x, y)-coordinates
-                    # of the bounding box for the object
-                    idx = int(detections[0, 0, i, 1])
-                    dims = np.array([W, H, W, H])
-                    box = detections[0, 0, i, 3:7] * dims
-                    (startX, startY, endX, endY) = box.astype("int")
-                    if CLASSES[idx] == "person":                    
-                        bbox = (startX, startY, endX, endY)
-                        
-                        # draw the prediction on the frame
-                        label = "{}: {:.2f}%".format(CLASSES[idx],confidence * 100)                   
+                # otherwise, extract the index of the class label from
+                # the `detections`, then compute the (x, y)-coordinates
+                # of the bounding box for the object
+                idx = int(detections[0, 0, i, 1])
+                dims = np.array([W, H, W, H])
+                box = detections[0, 0, i, 3:7] * dims
+                (startX, startY, endX, endY) = box.astype("int")
+                if CLASSES[idx] == "person":                    
+                    bbox = (startX, startY, endX, endY)
+                    
+                    # draw the prediction on the frame
+                    label = "{}: {:.2f}%".format(CLASSES[idx],confidence * 100)                   
 
-                        circle_cord = ((startX+endX)//2,(startY+endY)//2)
-                        move_direction = get_direction(circle_cord)
-                        print(f"Move: {move_direction}")
+                    circle_cord = ((startX+endX)//2,(startY+endY)//2)                        
+                    _MOVE_DIRECTION = get_direction(circle_cord)
+                    print(f"Move: {_MOVE_DIRECTION}")
 
-                        cv2.rectangle(frame, (startX, startY), (endX, endY),COLORS[idx], 2)
-                        cv2.circle(frame, circle_cord, radius=10, color=COLORS[idx], thickness=-1)      
-                        
-                        y = startY - 15 if startY - 15 > 15 else startY + 15
-                        cv2.putText(frame, label, (startX, y),cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[idx], 2)                    
-                                
-                        print(f"Object detected: {label}")
-                        print(f"Center X,Y: {circle_cord}")
+                    cv2.rectangle(frame, (startX, startY), (endX, endY),COLORS[idx], 2)
+                    cv2.circle(frame, circle_cord, radius=10, color=COLORS[idx], thickness=-1)      
+                    
+                    y = startY - 15 if startY - 15 > 15 else startY + 15
+                    cv2.putText(frame, label, (startX, y),cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[idx], 2)                    
+                            
+                    print(f"Object detected: {label}")
+                    print(f"Center X,Y: {circle_cord}")
                         
         # update the FPS counter
         fps.update()
@@ -238,7 +203,7 @@ def main():
         # the frame
         info = [            
             ("FPS", "{:.2f}".format(fps.fps())),
-            ("MOVE", move_direction)
+            ("MOVE", _MOVE_DIRECTION)
         ]
 
         # loop over the info tuples and draw them on our frame
@@ -249,6 +214,7 @@ def main():
 
         cv2.line(frame, pt1=(frame_width//2,0), pt2=(frame_width//2,frame_height), color=(0,0,255), thickness=1)
         cv2.line(frame, pt1=(0,frame_height//2), pt2=(frame_width,frame_height//2), color=(0,0,255), thickness=1)        
+        
         out.write(frame)        
         
         if platform.uname()[4] == "x86_64":
@@ -260,7 +226,7 @@ def main():
         if key == ord("q"):
             print("Key Q pressed...")        
             break
-        elif counter == 1000:
+        elif counter == 2000:
             break
 
     print("--- %s seconds ---" % (time.time() - start_time))   
@@ -278,9 +244,42 @@ def main():
 
     # close all windows
     cv2.destroyAllWindows()
-    
 
 if __name__ == '__main__':
+        # Construct the argument parser and parse the argumetns
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-v", "--video", type=str,
+                    help="path to input video fileeeee")
+    ap.add_argument("-p", "--prototxt", default="MobileNetSSD_deploy.prototxt.txt",
+                    help="path to Caffe 'deploy' prototxt file")
+    ap.add_argument("-m", "--model", default="MobileNetSSD_deploy.caffemodel",
+                    help="path to Caffe pre-trained model")
+    ap.add_argument("-c", "--confidence", type=float, default=0.20,
+                    help="minimum probability to filter weak detections")
+    args = vars(ap.parse_args())
+
+    # initialize the list of class labels MobileNet SSD was trained to
+    # detect, then generate a set of bounding box colors for each class
+    CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
+            "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
+            "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
+            "sofa", "train", "tvmonitor"]
+    COLORS = np.random.uniform(0, 255, size=(len(CLASSES), 3))
+
+
+    if not (os.path.isfile('MobileNetSSD_deploy.caffemodel') and os.path.isfile('MobileNetSSD_deploy.prototxt.txt')):
+        errorMsg = '''
+        Could not find GOTURN model in current directory.
+        Please ensure goturn.caffemodel and goturn.prototxt are in the current directory
+        '''
+
+        print(errorMsg)
+        sys.exit()
+
+    # load our serialized model from disk
+    print("[INFO] loading model...")
+    net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
+
     print("[INFO] starting process...") 
     p_classify = Process(target=classify_frame, args=(net, inputQueue,outputQueue))
     p_classify.daemon = True
@@ -296,15 +295,9 @@ if __name__ == '__main__':
         print("waiting...")        
         time.sleep(1)
 
-
     p_classify.terminate()    
     p_classify.join(timeout=1.0)
     p_classify.kill()
 
-    #https://stackoverflow.com/questions/32053618/how-to-to-terminate-process-using-pythons-multiprocessing
-    #https://cuyu.github.io/python/2016/08/15/Terminate-multiprocess-in-Python-correctly-and-gracefully
-
-    #inputQueue.close()
-    #outputQueue.close()
     print("[INFO] Done")
     sys.exit()
