@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/spartan/Documents/MAVSDK/examples/takeoff_land/build",
+  "command": "/bin/c++   -isystem /usr/local/include/mavsdk  -g   -Wall -Wextra -std=gnu++17 -o CMakeFiles/takeoff_and_land.dir/takeoff_and_land.cpp.o -c /home/spartan/Documents/MAVSDK/examples/takeoff_land/takeoff_and_land.cpp",
+  "file": "/home/spartan/Documents/MAVSDK/examples/takeoff_land/takeoff_and_land.cpp"
+}
+]

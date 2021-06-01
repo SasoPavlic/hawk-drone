@@ -1,0 +1,1 @@
+/usr/bin/c++     CMakeFiles/takeoff_and_land.dir/takeoff_and_land.cpp.o  -o takeoff_and_land -Wl,-rpath,/usr/local/lib /usr/local/lib/libmavsdk_telemetry.so.0.36.0 /usr/local/lib/libmavsdk_action.so.0.36.0 /usr/local/lib/libmavsdk_offboard.so.0.36.0 /usr/local/lib/libmavsdk.so.0.36.0 

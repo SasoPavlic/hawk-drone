@@ -1,0 +1,3 @@
+/home/spartan/Documents/MAVSDK/examples/takeoff_land/build/CMakeFiles/rebuild_cache.dir
+/home/spartan/Documents/MAVSDK/examples/takeoff_land/build/CMakeFiles/edit_cache.dir
+/home/spartan/Documents/MAVSDK/examples/takeoff_land/build/CMakeFiles/takeoff_and_land.dir
